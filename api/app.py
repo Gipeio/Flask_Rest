@@ -87,7 +87,7 @@ def get_pays_from_nom(nom):
         ]
     return jsonify(pays), 200
 
-@app.route('/pays/<string:nom>/departements')
+@app.route('/pays/<string:nom>/regions')
 def get_regions_from_pays(nom):
     """recupère les regions d'un pays"""
     regions = execute_query("""select regions.nom, regions.code
@@ -184,13 +184,12 @@ def get_departements_for_region(nom: str):
     return jsonify(departements), 200
 
 
-@app.route('/regions', methods=['POST'])
-def post_region():
+@app.route('/pays/<string:code_pays>/regions', methods=['POST'])
+def post_region(code_pays):
     """"Ajoute une région"""
-    code = int(request.args.get("code"))
+    code = request.args.get("code")
     nom = request.args.get("nom")
-    pays= request.args.get("pays")
-    execute_query("insert into regions (code, nom, id_pays) values (?,?,(select id from pays where id = ?))", (code, nom, pays))
+    execute_query("insert into regions (code, nom, id_pays) values (?,?,(select id from pays where nom = ?))", (code, nom, code_pays))
     # on renvoi le lien de la région que l'on vient de créer
     reponse_json = jsonify({
         "_links": [{
@@ -201,13 +200,12 @@ def post_region():
     return reponse_json, 201  # created
 
 
-@app.route('/departements', methods=['POST'])
-def post_departement_for_region():
+@app.route('/regions/<string:code_region>/departements', methods=['POST'])
+def post_departement_for_region(code_region):
     """créé un département"""
-    code_dpt = int(request.args.get("code"))
+    code_dpt = request.args.get("code")
     nom_dpt = request.args.get("nom")
-    region = request.args.get("region")
-    execute_query("insert into departements (code, nom, region_id) values (?, ?, (select id from regions where code = ?));", (code_dpt, nom_dpt, region))
+    execute_query("insert into departements (code, nom, region_id) values (?, ?, (select id from regions where nom = ?));", (code_dpt, nom_dpt, code_region))
     # on renvoi le lien du département  que l'on vient de créer
     reponse_json = jsonify({
         "_links": [{
@@ -261,9 +259,9 @@ def get_departement(code):
 @app.route('/departements/<string:code>/villes')
 def get_villes_for_departement(code):
     """Récupère les villes d'un département"""
-    villes = execute_query("""select villes.nom, villes.code
+    villes = execute_query("""select villes.nom, villes.id
                                     from villes
-                                    join departements on villes.departement_id = departements.id
+                                    join departements on villes.id_departement = departements.id
                                     where departements.code = ?""", (urllib.parse.unquote(code),))
     if villes == []:
         abort(404, "Aucune villes dans cette région")
@@ -275,11 +273,10 @@ def get_villes_for_departement(code):
         }]
     return jsonify(villes), 200
 
-@app.route('/villes', methods=['POST'])
-def post_ville_for_departement():
+@app.route('/departements/<string:code_departement>/villes', methods=['POST'])
+def post_ville_for_departement(code_departement):
     """créé une ville"""
     nom_ville = request.args.get("nom")
-    code_departement = request.args.get("dept")
     execute_query("insert into villes (nom, id_departement) values (?, (select id from departements where code = ?))", (nom_ville, code_departement))
     # on renvoi le lien de la ville que l'on vient de créer
     reponse_json = jsonify({
